@@ -75,19 +75,26 @@
            (arg-current (with-current-buffer buf (semantic-get-local-arguments)))
            (arg-list nil))
       (when arg-next
-        (dolist (a arg-next)
-          (let ((index 0)
-                (arg a))
-            (when arg-current
-              (dolist (c arg-current)
-                (if (string= (nth 0 c) a)
-                    (setq arg (nth index arg-current-real)))
-                (setq index (1+ index))))
+        (dolist (one-arg arg-next) ;;for all args
+          (let ((arg "")) ;;arg will be the complete argument
+            (dolist (sexp-arg one-arg) ;; for all parts of an arg
+              (let ((sexp-final sexp-arg)
+                    (index 0))
+                (when (and arg-current arg-current-real)
+                  (dolist (c arg-current)
+                    (when (string-match-p (concat "^[^[:alnum:]]*" (nth 0 c) "[^[:alnum:]]*$")
+                                          sexp-final)
+                      (setq sexp-final (replace-regexp-in-string (nth 0 c)
+                                                                 (nth index arg-current-real)
+                                                                 sexp-final)))
+                    (setq index (1+ index))))
+                (setq arg (concat arg sexp-final))))
             (setq arg-list (append arg-list (list arg))))))
       arg-list)))
 
 (defun tag-stack-get-args-at-point ()
-  "return arguments given to the function at point"
+  "return arguments given to the function at point
+This is a list of sexp list"
   (let ((args nil))
     (save-excursion
 
@@ -97,13 +104,17 @@
         (while (not (char-equal (char-after) ?\) ))
           (skip-chars-forward ",[:blank:]\n")
           (let ((beg (point))
-                (c (char-after)))
+                (c (char-after))
+                (arg nil))
             (while (not (or (char-equal c ?,)
                             (char-equal c ?\) )))
               (forward-sexp)
-              (setq c (char-after)))
+              (setq arg (append arg
+                                (list (buffer-substring-no-properties beg (point)))))
+              (setq beg (point)
+                    c (char-after)))
             (setq args (append args
-                               (list (buffer-substring-no-properties beg (point))))))))
+                               (list arg))))))
     args))
 
 
